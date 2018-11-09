@@ -4,7 +4,10 @@ from rest_framework.permissions import (
 )
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token 
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import (
     api_view,
     permission_classes
@@ -18,11 +21,52 @@ from .models import (
     Register,
     RideHistory
 )
+from .helper import (
+    auth_login,
+    auth_logout,
+)
+
 
 # Create your views here.
 
+@api_view(['POST'])
+@permission_classes((AllowAny,))
+def login(request):
+    resp={}
+    username = request.data.get('username', None)
+    password = request.data.get('password', None)
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        resp["status"] = 'Unauthorized user'
+        return Response(resp, status = status.HTTP_401_UNAUTHORIZED)
+
+    if Token.objects.filter(user=user).exists():
+        Token.objects.filter(user=user).delete()
+
+    token = Token.objects.create(user=user)
+    token.save()
+
+    resp['token'] = token.key
+    resp['username'] = token.user.username
+    resp['is_superuser'] = token.user.is_superuser
+
+
+    return Response(resp, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def logout(request):
+    user=request.user
+
+    if Token.objects.filter(user=user).exists():
+        Token.objects.filter(user=user).delete()
+
+    return Response(status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
+@permission_classes((AllowAny,))
 def register(request):
     resp={}
 
@@ -144,13 +188,15 @@ def complete_ride(request):
 @api_view(['GET'])
 @permission_classes((IsAuthenticated,))
 def get_ride_history(request):
-    resp = []
-    req_user = Register.objects.get(user_id=request.user)
 
-    data = RideHistory.objects.filter(
-        Q(customer_id=req_user.id) |
-        Q(driver_id=req_user.id)
-    )
+    if request.user.is_superuser:
+        data = RideHistory.objects.all()
+    else:
+        req_user = Register.objects.get(user_id=request.user)
+        data = RideHistory.objects.filter(
+            Q(customer_id=req_user.id) |
+            Q(driver_id=req_user.id)
+        )
     resp = [{
         'id': index+1,
         'ride_from': row.ride_from, 
