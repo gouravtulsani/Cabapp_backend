@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
 OPTION_CHOICES = [(1, 'sharing'), (2, 'personal'), (3, 'free')]

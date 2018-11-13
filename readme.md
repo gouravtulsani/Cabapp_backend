@@ -4,11 +4,12 @@ Cab app is a basic django application which provide REST api for cab booking sys
 loosely inspired by cab services like ola/uber.
 
 ## Features:
-  - Registration for new user and new dirver
-  - User can book a cab if available
-  - One user can only book one cab at a time
-  - Two user can't book the same cab at the same time
-  - User/Driver can see there rides history
+  - Registration for new user and new dirver.
+  - User can book a cab if available.
+  - One user can only book one cab at a time.
+  - Two user can't book the same cab at the same time.
+  - User/Driver can see there rides history.
+  - User can also book a sharing cab.
 
 ### Installation
 
@@ -27,9 +28,10 @@ $ python manage.py migrate && python manage.py runserver
 ```
 
 ## APIs
+
 ### Registration
 - API description:
-    - This api is use to register a new customer/driver
+    > This api is use to register a new customer/driver
 - Request Headers:
     - Request URL: **/api/register**
     - Supported Request Methods: POST
@@ -37,15 +39,15 @@ $ python manage.py migrate && python manage.py runserver
 - Example api request
 ```json
     {
-        "username": "<username>" `(unique)`,
+        "username": "<username>" "(unique)",
         "password": "<password>",
         "first_name": "<firstname>",
         "last_name": "<lastname>",
-        "email": "<email address>" `(unique)`,
-        "phone_number": "<ph_number>" (var char len(10), unique)`,
+        "email": "<email address>" "(unique)",
+        "phone_number": "<ph_number>" "(var char len(10), unique)",
         "is_driver": "<true/false>",
-        "car_model": "<car model>" `(required if is_driver is true)`,
-        "car_number": "<car number>" `(required if is_driver is true)`
+        "car_model": "<car model>" "(required if is_driver is true)",
+        "car_number": "<car number>" "(required if is_driver is true)"
     }
 ```
 - Response headers:
@@ -60,11 +62,62 @@ $ python manage.py migrate && python manage.py runserver
     - Response Body: *text message indicating reason for failure*
     - Conditions for Failure:
         - username/email/phone_number/car_details already
+
+### Login
+- API description:
+    > This api is use to login into the app
+      and after successful login you'll get 
+      token which you'll use for authentication
+- Request Headers:
+    - Request URL: **/api/complete_ride**
+    - Supported Request Methods: POST
+    - Content-Type: application/json
+- Example api request
+```json
+    {
+        "username": "<username>" "(required)",
+        "password": "<password>" "(required)"
+    }
+```
+- Response headers:
+- Status ``200``:
+    - Content-Type: application/json
+    - Response Body: *login successfully*
+    - Conditions for Success:
+        - Only if the input username and password is valid.
+- Status ``400``:
+    - Content-Type: application/json
+    - Response Body: *text message indicating reason for failure*
+    - Conditions for Failure:
+        - username or password is incorrect
+
+### Logout
+- API description:
+    > This api is use to logout from the app
+      Token authentication required
+- Request Headers:
+    - Request URL: **/api/complete_ride**
+    - Supported Request Methods: GET
+    - Content-Type: application/json
+- Response headers:
+- Status ``200``:
+    - Content-Type: application/json
+    - Response Body: *logout successfully*
+    - Conditions for Success:
+        - Only if the user is authenticated.
+- Status ``400``:
+    - Content-Type: application/json
+    - Response Body: *text message indicating reason for failure*
+    - Conditions for Failure:
+        - authentication credentials not provided
+        - invalid token
+
+
 ### Book ride
 - API description:
     > This api is use to book a new ride.
     Only a customer can book a new ride, if there is no pending ride.
-    Basie authentication required: <username> and <password>
+    Token authentication required
 
 - Request Headers:
     - Request URL: **/api/book_ride**
@@ -73,8 +126,10 @@ $ python manage.py migrate && python manage.py runserver
 - Example api request
 ```json
     {
-        "ride_from": "<ride from>" `(required)`,
-        "ride_to": "<ride to>" `(required)`
+        "ride_from": "<ride from>" "(required)",
+        "ride_to": "<ride to>" "(required)",
+        "sharing": "<true or false>" "(required)",
+        "seats": "<1 or 2>" "(required if sharing is true)"
     }
 ```
 - Response headers:
@@ -89,14 +144,22 @@ $ python manage.py migrate && python manage.py runserver
     - Conditions for Failure:
         - requesting user is a driver
         - requesting user has already a ride in progress
+
 ### Complete ride
 - API description:
     > This api is use to complete the existing ride
     only a driver can complete the ride
+    Token authentication required
 - Request Headers:
     - Request URL: **/api/complete_ride**
-    - Supported Request Methods: GET
+    - Supported Request Methods: POST
     - Content-Type: application/json
+- Example api request
+```json
+    {
+        "customer_name": "<customer username>" "(required)"
+    }
+```
 - Response headers:
 - Status ``200``:
     - Content-Type: application/json
@@ -109,9 +172,11 @@ $ python manage.py migrate && python manage.py runserver
     - Conditions for Failure:
         - requesting user is a customer not driver
         - No on going ride
+
 ### Get ride history
 - API description:
-    - This api is use to get the ride history of the requesting user
+    > This api is use to get the ride history of the requesting user
+      Token authentication required
 - Request Headers:
     - Request URL: **/api/get_ride_history**
     - Supported Request Methods: GET

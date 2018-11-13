@@ -74,6 +74,7 @@ def login(request):
     token = Token.objects.create(user=user)
     token.save()
 
+    resp['status'] = 'login successfully'
     resp['token'] = token.key
     resp['username'] = token.user.username
     resp['is_superuser'] = token.user.is_superuser
