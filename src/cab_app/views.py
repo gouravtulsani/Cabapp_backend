@@ -35,6 +35,28 @@ FREE = '3'
 
 # Create your views here.
 
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def home(request):
+    resp = {'home': 'welcome to cab app',
+    'user_details': {
+            'username': request.user.username,
+            'active_user': request.user.is_active,
+            'token': request.auth.key,
+            'email': request.user.email,
+        }
+    }
+    user = Register.objects.get(user_id=request.user)
+    resp['user_details']['phone_number'] = user.phone_number
+    resp['user_details']['full_name'] = user.first_name + ' ' + user.last_name
+
+    if user.is_driver:
+        resp['user_details']['car_model'] = user.car_model
+        resp['user_details']['car_number'] = user.car_number
+
+    return Response(resp, status=status.HTTP_200_OK)
+
+
 @api_view(['POST'])
 @permission_classes((AllowAny,))
 def login(request):
