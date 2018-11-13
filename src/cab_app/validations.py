@@ -5,7 +5,7 @@ from django.db.models import Q
 from .models import Register
 
 PHONE_NO_REGEX = re.compile(r'^\d{10}$')
-CAR_NO_REGEX = re.compile(r'^(([A-Za-z]){2}(-)(?:[0-9]){1,2}(-)(?:[A-Za-z]){2}(-)([0-9]){1,4})$')
+CAR_NO_REGEX = re.compile(r'^(([A-Za-z]){2}(-)(?:[0-9]){1,2}(-)(?:[A-Za-z]){1,2}(-)([0-9]){1,4})$')
 
 
 def validate_phone_number(phone_number):

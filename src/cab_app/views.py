@@ -15,7 +15,8 @@ from rest_framework.decorators import (
 from rest_framework import status
 from .serializers import (
     RegisterSerializer,
-    BookRideSerializer
+    BookRideSerializer,
+    CompleteRideSerializer
 )
 from .models import (
     Register,
@@ -26,6 +27,11 @@ from .helper import (
     auth_logout,
 )
 
+# constants
+MAX_SEAT = 4
+SHARING = '1'
+PERSONAL = '2'
+FREE = '3'
 
 # Create your views here.
 
@@ -62,7 +68,9 @@ def logout(request):
     if Token.objects.filter(user=user).exists():
         Token.objects.filter(user=user).delete()
 
-    return Response(status=status.HTTP_200_OK)
+    resp = {'status': 'logout'}
+
+    return Response(resp, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -93,6 +101,7 @@ def register(request):
         )
         d.save()
         resp['status'] = 'Driver registered successfully'
+        
     else:
         c = Register.objects.create(user_id=User.objects.get(username=data['username']),
             first_name=data['first_name'], last_name=data['last_name'],
@@ -122,59 +131,121 @@ def book_ride(request):
     if usr.is_driver:
         resp['status'] = 'Driver can not book a cab, register yourself as customer'
         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-    if usr.busy:
+    if usr.booking_status != FREE:
         resp['status'] = 'Your ride is already in porgress, cannot book more than one cab at the same time'
         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
-    driver_available = Register.objects.filter(is_driver=True).filter(busy=False).first()
-    if not driver_available:
-        resp['status'] = 'Sorry, No free driver available please try again'
-        return Response(resp, status=status.HTTP_200_OK)
+    if not data['sharing']:
+        driver_available = Register.objects.filter(Q(is_driver=True), Q(booking_status=FREE)).first()
+        if not driver_available:
+            resp['status'] = 'Sorry, No free driver available please try again'
+            return Response(resp, status=status.HTTP_200_OK)
 
-    r = RideHistory.objects.create(
-        customer = usr,
-        driver = driver_available,
-        ride_from = data['ride_from'],
-        ride_to = data['ride_to']
-    )
-    r.save()
-    resp['status'] = 'cab booked successfully'
-    resp['driver_details'] = {
-        'name': driver_available.user_id.username,
-        'phone_number': driver_available.phone_number,
-        'car_model': driver_available.car_model,
-        'car_number': driver_available.car_number
-    }
-    driver_available.busy = True
-    driver_available.save()
-    usr.busy = True
-    usr.save()
+        r = RideHistory.objects.create(
+            customer = usr,
+            driver = driver_available,
+            ride_from = data['ride_from'],
+            ride_to = data['ride_to'],
+            share=data['sharing']
+        )
+        r.save()
+        resp['status'] = 'cab booked successfully'
+        resp['driver_details'] = {
+            'name': driver_available.user_id.username,
+            'phone_number': driver_available.phone_number,
+            'car_model': driver_available.car_model,
+            'car_number': driver_available.car_number
+        }
+        driver_available.booking_status = PERSONAL
+        driver_available.seats_booked = MAX_SEAT
+        driver_available.save()
+        usr.booking_status = PERSONAL
+        usr.seats_booked = MAX_SEAT
+        usr.save()
+    else:
+        drivers = Register.objects.filter(Q(is_driver=True),
+            Q(booking_status=FREE) |
+            Q(booking_status=SHARING)
+        )
+
+        for obj in drivers.order_by('-seats_booked'):
+            if int(obj.seats_booked) + data['seats'] > MAX_SEAT:
+                continue
+            driver_available = obj
+            break
+
+        if driver_available:
+            r = RideHistory.objects.create(
+                customer = usr,
+                driver = driver_available,
+                ride_from = data['ride_from'],
+                ride_to = data['ride_to'],
+                share=data['sharing']
+            )
+            r.save()
+            resp['status'] = 'cab booked successfully'
+            resp['driver_details'] = {
+                'name': driver_available.user_id.username,
+                'phone_number': driver_available.phone_number,
+                'car_model': driver_available.car_model,
+                'car_number': driver_available.car_number
+            }
+            driver_available.booking_status = SHARING
+            driver_available.seats_booked += data['seats']
+            driver_available.save()
+            usr.booking_status = SHARING
+            usr.seats_booked = data['seats']
+            usr.save()
 
     return Response(resp, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
+@api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 def complete_ride(request):
     resp={}
+
+    serializer = CompleteRideSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    customer_name = serializer.validated_data['customer_name']
 
     driver = Register.objects.get(user_id=request.user.id)
     if not driver.is_driver:
         resp['status'] = 'Customer can not cancel ride, ask your driver to do that for you'
         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
-    ride_detail = RideHistory.objects.filter(driver=driver).filter(complete=False).first()
+    customer_detail =  User.objects.filter(username=customer_name)
+    if not customer_detail:
+        resp['status'] = 'no such customer found'
+        return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+    customer_detail = Register.objects.get(user_id=customer_detail[0])
+    seats_booked_by_customer = customer_detail.seats_booked
+
+    ride_detail = RideHistory.objects.filter(
+        Q(driver_id=driver.id),
+        Q(customer_id=customer_detail.id),
+        Q(complete=False)
+    )
     if not ride_detail:
         resp['status'] = 'No on going ride found'
         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
+    ride_detail = ride_detail[0]
     ride_detail.complete = True
     ride_detail.save()
     customer = ride_detail.customer
-    customer.busy = False
+    customer.booking_status = FREE
+    customer.seats_booked = 0
     customer.save()
-    driver.busy = False
+
+    if driver.seats_booked == seats_booked_by_customer:
+        driver.booking_status = FREE
+    else:
+        driver.seats_booked -= seats_booked_by_customer 
     driver.save()
+
     resp['status'] = 'ride completed successfully'
     resp['ride_detail'] = {
         'from': ride_detail.ride_from,

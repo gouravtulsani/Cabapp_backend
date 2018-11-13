@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
+OPTION_CHOICES = [(1, 'sharing'), (2, 'personal'), (3, 'free')]
 
 class Register(models.Model):
 	"""This is a user register
@@ -15,7 +16,8 @@ class Register(models.Model):
 	is_driver = models.BooleanField(default=False)
 	car_model = models.CharField(max_length=20)
 	car_number = models.CharField(max_length=10)
-	busy = models.BooleanField(default=False)
+	booking_status = models.CharField(max_length=8, choices=OPTION_CHOICES, default=3)
+	seats_booked = models.IntegerField(default=0)
 
 	def __str__(self):
 		return "%s" % (self.user_id.username)
@@ -31,6 +33,8 @@ class RideHistory(models.Model):
 	ride_to = models.CharField(max_length=60)
 	ride_time = models.DateTimeField(auto_now_add=True, editable=False)
 	complete = models.BooleanField(default=False)
+	share = models.BooleanField(default=False)
+
 
 	def __str__(self):
-		return "customer: %s, driver: %s, time: %s" % (self.customer, self.driver, self.ride_time)
+		return "id: %s, customer: %s, driver: %s, time: %s" % (self.ride_id, self.customer, self.driver, self.ride_time)

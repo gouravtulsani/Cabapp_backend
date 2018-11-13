@@ -6,6 +6,9 @@ from .validations import (
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
+# CONSTANTS
+MAX_SEATS_FOR_SHARE = 2
+
 User = get_user_model()
 
 class RegisterSerializer(serializers.Serializer):
@@ -42,17 +45,32 @@ class RegisterSerializer(serializers.Serializer):
         return data
 
 class BookRideSerializer(serializers.Serializer):
-    """docstring for BookRideSerializer"""
     ride_from = serializers.CharField(required=True, max_length=30)
     ride_to = serializers.CharField(required=True, max_length=30)
+    sharing = serializers.BooleanField(required=True)
+    seats = serializers.IntegerField(required=False)
 
     def validate(self, data):
         errors = []
         if data['ride_from'] == data['ride_to']:
             errors.append('ride_from and ride_to can not be the same')
 
+        if data['sharing']:
+            if 'seats' not in data:
+                errors.append('specify no. of seats 1 or 2.')
+            else:
+                if not 0 < data['seats'] <= MAX_SEATS_FOR_SHARE:
+                    errors.append('InValid no. of seats expected 1 or 2')
+        else:
+            if 'seats' in data:
+                errors.append('cannot specify no. of seats with personal ride.')
+            else:
+                data['seats'] = 4
 
         if len(errors) != 0:
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+class CompleteRideSerializer(serializers.Serializer):
+    customer_name = serializers.CharField(required=True, max_length=30)        

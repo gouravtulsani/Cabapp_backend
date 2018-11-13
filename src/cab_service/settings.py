@@ -130,3 +130,39 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated', )
 }
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '|%(levelname)s| |%(asctime)s| |%(module)s| %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'debug',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+    },
+    'loggers': {
+        'cab_app': {},
+    },
+}
+
+LOGGING['handlers']['console']['level'] = 'DEBUG'
+
+LOGGING['loggers'] = {
+    'cab_app': {
+        'handlers': ['console'],
+        'level': 'INFO',
+        'propagate': True,
+    },
+    'django.db.backends': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}
